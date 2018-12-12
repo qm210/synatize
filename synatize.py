@@ -48,6 +48,10 @@ if __name__ == '__main__':
             print(len(arg))
             osc = {'name':cid, 'shape':arg[0], 'freq':arg[1], 'phase':arg[2] if len(arg)>=2 else '0', 'quant':arg[3] if len(arg)>=3 else '1', \
                    'detune': 0}
+            
+            #some replacements
+            if osc['shape'] == 'sin': osc['shape'] = '_sin'
+            
             osc_list.append(osc)
 
         elif cmd == 'detune':
@@ -73,7 +77,7 @@ if __name__ == '__main__':
     gf.close()
     
     BPM = 80
-    note = 25
+    note = 24
 
     glslcode = glslcode.replace("//SYNCODE",syncode) \
                        .replace("const float note = 24.;", "const float note = " + float2str(note) + ";") \
