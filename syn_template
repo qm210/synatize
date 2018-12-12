@@ -1,3 +1,2 @@
-P[0] * sin(2.*PI*f*t + P[2] * exp(-P[1]*t)*sin(2*PI*f*t-PI/2)) * exp(-2.*t) * smoothstep(0.,.1,t)
-f = 220
-P = [.27, 2., 1.]
+osc base sin f 0 3
+detune base 0.01

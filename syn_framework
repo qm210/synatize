@@ -1,0 +1,129 @@
+#define PI radians(180.)
+float _sin(float a) { return sin(2. * PI * mod(a,1.)); }
+float _unisin(float a,float b) { return (.5*_sin(a) + .5*_sin((1.+b)*a)); }
+float _sq(float a) { return sign(2.*fract(a) - 1.); }
+float _squ(float a,float pwm) { return sign(2.*fract(a) - 1. + pwm); }
+float _tri(float a) { return (4.*abs(fract(a)-.5) - 1.); }
+float _saw(float a) { return (2.*fract(a) - 1.); }
+float quant(float a,float div,float invdiv) { return floor(div*a+.5)*invdiv; }
+float quanti(float a,float div) { return floor(div*a+.5)/div; }
+float clip(float a) { return clamp(a,-1.,1.); }
+float theta(float x) { return smoothstep(0., 0.01, x); }
+float freqC1(float note){ return 32.7 * pow(2.,note/12.); }
+float minus1hochN(int n) { return (1. - 2.*float(n % 2)); }
+
+#define pat4(a,b,c,d,x) mod(x,1.)<.25 ? a : mod(x,1.)<.5 ? b : mod(x,1.) < .75 ? c : d
+
+const float note = 24.;
+
+const float BPM = 80.;
+const float BPS = BPM/60.;
+const float SPB = 60./BPM;
+
+float doubleslope(float t, float a, float d, float s)
+{
+    return smoothstep(-.00001,a,t) - (1.-s) * smoothstep(0.,d,t-a);
+}
+
+float s_atan(float a) { return 2./PI * atan(a); }
+float s_crzy(float amp) { return clamp( s_atan(amp) - 0.1*cos(0.9*amp*exp(amp)), -1., 1.); }
+float squarey(float a, float edge) { return abs(a) < edge ? a : floor(4.*a+.5)*.25; } 
+
+float TRISQ(float t, float f, int MAXN, float MIX, float INR, float NDECAY, float RES, float RES_Q)
+{
+    float ret = 0.;
+    
+    int Ninc = 8; // try this: leaving out harmonics...
+    
+    for(int N=0; N<=MAXN; N+=Ninc)
+    {
+        float mode     = 2.*float(N) + 1.;
+        float inv_mode = 1./mode; 		// avoid division? save table of Nmax <= 20 in some array or whatever
+        float comp_TRI = (N % 2 == 1 ? -1. : 1.) * inv_mode*inv_mode;
+        float comp_SQU = inv_mode;
+        float filter_N = pow(1. + pow(float(N) * INR,2.*NDECAY),-.5) + RES * exp(-pow(float(N)*INR*RES_Q,2.));
+
+        ret += (MIX * comp_TRI + (1.-MIX) * comp_SQU) * filter_N * _sin(mode * f * t);
+    }
+    
+    return ret;
+}
+
+float QTRISQ(float t, float f, float QUANT, int MAXN, float MIX, float INR, float NDECAY, float RES, float RES_Q)
+{
+    return TRISQ(quant(t,QUANT,1./QUANT), f, MAXN, MIX, INR, NDECAY, RES, RES_Q);
+}
+
+float env_ADSR(float x, float L, float A, float D, float S, float R)
+{
+    float att = pow(x/A,8.);
+    float dec = S + (1.-S) * exp(-(x-A)/D);
+    float rel = (x < L-R) ? 1. : pow((L-x)/R,4.);
+
+    return (x < A ? att : dec) * rel;
+    
+}
+
+float macesaw(float t, float f, float CO, float Q, float det1, float det2, float res, float resQ)
+{
+    float s = 0.;
+    float inv_CO = 1./CO;
+    float inv_resQ = 1./resQ;
+    float p = f*t;
+        for(int N=1; N<=200; N++)
+        {
+            // saw
+            float sawcomp = 2./PI * (1. - 2.*float(N % 2)) * 1./float(N);
+            float filterN  = pow(1. + pow(float(N)*f*inv_CO,Q),-.5)
+                     + res * exp(-pow((float(N)*f-CO)*inv_resQ,2.));
+            
+            if(abs(filterN*sawcomp) < 1e-6) break;
+        		
+            if(det1 > 0. || det2 > 0.)
+            {
+                s += 0.33 * (_sin(float(N)*p) + _sin(float(N)*p*(1.+det1)) + _sin(float(N)*p*(1.+det2)));
+            }
+            else
+            {
+                s += filterN * sawcomp * _sin(float(N)*p);
+            }
+        }
+    return s;
+}
+
+float THESYNTH(float t, float B, float Bon, float Boff, float note, int Bsyn)
+{
+    float Bprog = B-Bon;
+    float Bproc = Bprog/(Boff-Bon);
+    float _t = SPB*(B - Bon);
+    float f = freqC1(note);
+
+    float env = theta(B-Bon) * theta(Boff-B);
+	float s = _sin(t*f);
+		
+	//SYNCODE
+	
+	return clamp(env,0.,1.) * clamp(s, -0.999,0.999);
+}
+
+float BA8(float x, int pattern)
+{
+    x = mod(x,1.);
+    float ret = 0.;
+	for(int b = 0; b < 8; b++)
+        ret += step(x,float(7-b)/8.) * float((pattern & (1<<b)) > 0);
+//    	if((pattern & (1<<b)) > 0)) ret += step(x,float(7-b)/8.); // better
+    return ret * .125;
+}
+
+vec2 mainSound( float time )
+{
+    vec3 pat_major = vec3(75,-120,73);
+    vec3 pat_minor = vec3(107,-152,79);
+    int track_len = 16;
+	float B = mod(BPS*time,float(track_len));
+    
+    float s = THESYNTH(time, B, 0., float(track_len), note, 1);
+    
+    return vec2(s_atan(s));
+}
