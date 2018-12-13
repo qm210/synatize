@@ -103,7 +103,7 @@ float THESYNTH(float t, float B, float Bon, float Boff, float note, int Bsyn)
 		
 	//SYNCODE
 	
-	return clamp(env,0.,1.) * clamp(s, -0.999,0.999);
+	return clamp(env,0.,1.) * s_atan(s);
 }
 
 float BA8(float x, int pattern)

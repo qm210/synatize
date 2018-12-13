@@ -2,86 +2,141 @@ import math
 import numpy as np
 import pyperclip
 
-if __name__ == '__main__':
+GLfloat = lambda f: str(int(f)) + '.' if f==int(f) else str(f)[0 if f >= 1 else 1:]
+GLstr = lambda x: GLfloat(float(x))
+
+synhead = ""
+syncode = ""
+
+#reserved keywords you cannot name a form after
+_f = {'ID':'f', 'type':'uniform'}
+_t = {'ID':'t', 'type':'uniform'}
+_B = {'ID':'B', 'type':'uniform'}
+_vel = {'ID':'vel', 'type':'uniform'} # maybe we want to use that
+form_list = [_f, _t, _B, _vel]
+
+form_main = None
+
+def main():
+
+    global synhead
+    global syncode
+    global form_list
+    global form_main
    
     with open("./syn_template","r") as template:
         lines = template.readlines()
         
-    # translate GLSL to Python
-    sin         = math.sin
-    cos         = math.cos
-    exp         = math.exp
-    PI          = np.pi
-    step        = lambda a,x : 0 if x < a else 1
-    smoothstep  = lambda a,b,x : 0 if x < a else 1 if x > b else 3*((x-a)/(b-a))**2 - 2 * ((x-a)/(b-a))**3
-    doubleslope = lambda x,a,d,s: smoothstep(-.00001,a,x) - (1.-s) * smoothstep(0.,d,x-a);
-    clamp       = lambda x,a,b: min(b, max(a,x))
-    fract       = lambda x: math.modf(x)[0]
-    _sin        = lambda x: math.sin(2. * np.pi * (x % 1.))
-    _saw        = lambda x: 2.*fract(x) - 1.
-    _tri        = lambda x: 4.*abs(fract(x)-.5)-1
-    s_atan      = lambda x: 2./np.pi * math.atan(x)
-    s_crzy      = lambda x: clamp(s_atan(x) - 0.1*math.cos(0.9*x*math.exp(x)), -1., 1.)
-    mix         = lambda x, y, a: a*y + (1-a)*x
-
-    float2str = lambda f: str(int(f)) + '.' if f==int(f) else str(f)[0 if f >= 1 else 1:]
-    GLstr       = lambda x: float2str(float(x))
-
-    syncode = ""
-
-    osc_list = []
-
     for l in lines:
         line = l.split()
         cmd = line[0]
         cid = line[1]
         arg = line[2:]
-        print(line)
-        
-        if cmd == 'def':
-            exec(' '.join(line[1:]))
-        
-        elif cmd == 'float':
-            syncode += ' '.join(line[0:3]) + float2str(float(arg[1])) + ';\n';
-    
-        elif cmd == 'osc':
-            print(len(arg))
-            osc = {'name':cid, 'shape':arg[0], 'freq':arg[1], 'phase':arg[2] if len(arg)>=2 else '0', 'quant':arg[3] if len(arg)>=3 else '1', \
-                   'detune': 0}
-            
-            #some replacements
-            if osc['shape'] == 'sin': osc['shape'] = '_sin'
-            
-            osc_list.append(osc)
+       
+        print(cmd, len(arg))
 
-        elif cmd == 'detune':
-            osc = next((o for o in osc_list if o['name']==cid), None)
-            osc['detune'] = float(arg[0])
-        
-    for osc in osc_list:
-        tcode = 't' if osc['quant'] == '1' else '(t*'+GLstr(osc['quant'])+')/'+GLstr(osc['quant'])
-        if(osc['detune']>0):
-            syncode += 's+= .5*' + osc['shape'] + '(' + osc['freq'] + '*' + tcode + ' + ' + GLstr(osc['phase']) + ')' \
-                      + ' + .5*' + osc['shape'] + '(' + osc['freq'] + '*' + float2str(1-osc['detune']) + '*' + tcode + ' + ' + GLstr(osc['phase']) + ');'
-        else:
-            syncode += 's+= ' + osc['shape'] + '(' + osc['freq'] + '*' + tcode + ' + ' + GLstr(osc['phase']) + ');'
+        if cmd == 'main':
+            if form_main is not None: print("WARNING: multiple main forms. Last definition will be the one.")
+            form_main = {'ID':'main', 'type':'main', 'amount':len(line)-1, 'terms':line[1:]}
 
-    #syncode = syncode.replace(' =','=').replace('= ','=').replace('\n','')
+        elif cmd == 'const':
+            form_list.append({'ID':cid, 'type':cmd, 'value':float(arg[0])})
     
-    print("")
-    print("AND NOW THE CODE IS:")
-    print(syncode)
+        elif cmd == 'osc' or cmd == 'lfo':
+            form_list.append({'ID':cid, 'type':cmd, 'shape':arg[0], 'freq':arg[1], 'phase':arg[2] if len(arg)>2 else '0'})
+
+        elif cmd == 'env': #env NAME adsf a d s f
+            form_list.append({'ID':cid, 'type':cmd, 'shape':arg[0], 'attack':arg[1], 'decay':arg[2], 'sustain':arg[3], 'release':arg[4]})
+
+        # global automation curve - no idea on how to parametrize, but have that idea in mind
+        elif cmd == 'gac':
+            pass
+            form_list.append(form_main)
+
+        # advanced forms ("operators"), like detune, chorus, delay, waveshaper/distortion, and more advanced: filter, reverb
+        elif cmd == 'form':
+            op = arg[0]
+            form = {'ID':cid, 'type':cmd, 'OP':op}
+
+            if op == 'mix':
+                form.update({'amount':len(arg), 'terms':arg[1:]})
+            
+            elif op == 'detune':
+                form.update({'source':arg[1], 'amount':arg[2]})
+            
+            else:
+                pass
+                
+            form_list.append(form)
+
+
+    print("\nLIST OF FORMS:\n", sep="")
+    for form in form_list:
+
+        if form['type'] == 'const':
+            synhead += 'float ' + form['ID'] + ' = ' + GLfloat(form['value']) + ';\n'
+
+        elif form['type'] == 'osc':
+            synhead += 'float ' + form['ID'] + '(float t, float f, float B, float vel, float phase, float par){return ';
+            
+            if form['shape'] == 'sin':
+                synhead += 'vel * sin(2. * PI * mod(f*t,1.) + phase);}\n'
+            else:
+                synhead += '0.;}\n'
+    
+    print("\nBUILD SYN HEADER:\n", synhead, sep="")
+
+    if not form_main:
+        print("WARNING: no main form defined! will return empty sound")
+        syncode = "s = 0.; //some annoying weirdo forgot to define the main form!"
+
+    else:
+        syncode = "s = "
+        for term in form_main['terms']:
+            termfac = term.split('*')
+            for fac in termfac:
+                syncode += instance(fac) + ('*' if fac != termfac[-1] else '')
+            syncode += '\n' + 6*' ' + '+ ' if term != form_main['terms'][-1] else ';'
 
     gf = open("syn_framework")
     glslcode = gf.read()
     gf.close()
+
+    print("\nBUILD SYN BODY:\n", syncode, sep="")
     
     BPM = 80
     note = 24
 
     glslcode = glslcode.replace("//SYNCODE",syncode) \
-                       .replace("const float note = 24.;", "const float note = " + float2str(note) + ";") \
-                       .replace("const float BPM = 80.;", "const float BPM = " + float2str(BPM) + ";")
+                       .replace("const float note = 24.;", "const float note = " + GLfloat(note) + ";") \
+                       .replace("const float BPM = 80.;", "const float BPM = " + GLfloat(BPM) + ";")
 
     pyperclip.copy(glslcode)
-    print("", "full shader written to clipboard")
+    print("\nfull shader written to clipboard")
+
+def instance(ID):
+    global form_list
+    form = next((f for f in form_list if f['ID']==ID), None)
+    
+    if not form:
+        return GLstr(ID)
+    
+    elif form['type']=='uniform':
+        return ID
+    
+    elif form['type']=='const':
+        return GLfloat(form['value'])
+    
+    elif form['type']=='form':
+        print(form)
+        
+        if form['OP'] == 'detune':
+            return 's_atan(' + instance(form['source']) + '+(1-' + instance(form['amount']) + ')*' + instance(form['source']) + ')'
+        else:
+            return '1.'
+        
+    else: #basic forms - but you have to differentiate
+        return ID + '(t,f,B)'
+
+if __name__ == '__main__':
+    main()

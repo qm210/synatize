@@ -1,2 +1,8 @@
-osc base sin f 0 3
-detune base 0.01
+const a 2
+lfo lfo1 sin .125
+osc base sin f 0
+form baseD detune base 0.01
+form baseQ quantize base 3
+osc FMsyn saw 0.5*f base
+form f2 mix 0.1 0.2*f 3*B 0*
+main .5*a*baseD 0.5*FMsyn
