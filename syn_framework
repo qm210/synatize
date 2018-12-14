@@ -32,6 +32,30 @@ float s_atan(float a) { return 2./PI * atan(a); }
 float s_crzy(float amp) { return clamp( s_atan(amp) - 0.1*cos(0.9*amp*exp(amp)), -1., 1.); }
 float squarey(float a, float edge) { return abs(a) < edge ? a : floor(4.*a+.5)*.25; } 
 
+float supershape(float s, float amt, float A, float B, float C, float D, float E)
+{
+    float w;
+    float m = sign(s);
+    s = abs(s);
+
+    if(s<A) w = B * smoothstep(0.,A,s);
+    else if(s<C) w = C + (B-C) * smoothstep(C,A,s);
+    else if(s<=D) w = s;
+    else if(s<=1.)
+    {
+        float _s = (s-D)/(1.-D);
+        w = D + (E-D) * (1.5*_s*(1.-.33*_s*_s));
+    }
+    else return 1.;
+    
+    return m*mix(s,w,amt);
+}
+
+float GAC(float t, float a, float b, float c, float d, float e, float f, float g)
+{
+    return a + b*t + c*t*t + d*sin(e*t) + f*exp(-g*t);
+}
+
 float TRISQ(float t, float f, int MAXN, float MIX, float INR, float NDECAY, float RES, float RES_Q)
 {
     float ret = 0.;
@@ -132,7 +156,7 @@ vec2 mainSound( float time )
 {
     vec3 pat_major = vec3(75,-120,73);
     vec3 pat_minor = vec3(107,-152,79);
-    int track_len = 16;
+    int track_len = 8;
 	float B = mod(BPS*time,float(track_len));
     
     float s = THESYNTH(time, B, 0., float(track_len), note, 1);

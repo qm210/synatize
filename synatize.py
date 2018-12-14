@@ -51,7 +51,7 @@ def main():
         lines = template.readlines()
         
     for l in lines:
-        if l[0]=='#': continue
+        if l=='\n' or l[0]=='#': continue
     
         line = l.split()
         cmd = line[0]
@@ -114,6 +114,10 @@ def main():
                 form.update({'source':arg[1], 'number':arg[2], 'delay':arg[3]})
             elif op == 'delay':
                 form.update({'source':arg[1], 'number':arg[2], 'delay':arg[3], 'decay':arg[4]})
+            elif op == 'waveshape':
+                form.update({'source':arg[1], 'par':arg[2:8]})
+            elif op == 'saturate':
+                form.update({'source':arg[1], 'gain':arg[2], 'mode':arg[3] if len(arg)>3 else 'default'})
             else:
                 pass
                 
@@ -197,6 +201,13 @@ def instance(ID, mod={}):
         elif form['OP'] == 'delay': #not finished, needs study
             return '(' + newlineplus.join(['{:.1e}'.format(pow(float(form['decay']),t)) + '*' + \
                                            instance(form['source']).replace('_RESETTIME','(_RESETTIME-'+'{:.1e}'.format(t*float(form['delay']))+')') for t in range(int(form['number']))]) + ')'
+        elif form['OP'] == 'waveshape':
+            return 'supershape(' + instance(form['source']) + ',' + ','.join(instance(form['par'][p]) for p in range(6)) + ')'
+        elif form['OP'] == 'saturate':
+            if form['mode'] == 'crazy':
+                return 's_crzy('+instance(form['gain']) + '*' + instance(form['source']) + ')'
+            else:
+                return 's_atan('+instance(form['gain']) + '*' + instance(form['source']) + ')'
         else:
             return '1.'
 
