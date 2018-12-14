@@ -1,7 +1,12 @@
 next todos:
-GAC
-waveshaper
 
 even later:
 filter
 reverb
+
+the finishing move:
+combine with song editor / sequencer...
+
+some time:
+Karplus-Strong string synthesis: https://en.wikipedia.org/wiki/Karplus%E2%80%93Strong_string_synthesis
+Schroeder reverb: https://valhalladsp.com/2009/05/30/schroeder-reverbs-the-forgotten-algorithm/

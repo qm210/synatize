@@ -32,7 +32,8 @@ _SPB = {'ID':'SPB', 'type':'uniform'}
 _BPS = {'ID':'BPS', 'type':'uniform'}
 _BPM = {'ID':'BPM', 'type':'uniform'}
 _note = {'ID':'note', 'type':'uniform'}
-form_list = [_f, _t, _B, _vel, _Bsyn, _Bproc, _Bprog, _L, _tL, _SPB, _BPS, _BPM, _note]
+_Fsample = {'ID':'Fsample', 'type':'uniform'}
+form_list = [_f, _t, _B, _vel, _Bsyn, _Bproc, _Bprog, _L, _tL, _SPB, _BPS, _BPM, _note, _Fsample]
 
 main_list = []
 

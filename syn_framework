@@ -23,6 +23,8 @@ const float BPM = 80.;
 const float BPS = BPM/60.;
 const float SPB = 60./BPM;
 
+const float Fsample = 44100.; // I think?
+
 float doubleslope(float t, float a, float d, float s)
 {
     return smoothstep(-.00001,a,t) - (1.-s) * smoothstep(0.,d,t-a);
