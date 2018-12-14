@@ -1,11 +1,18 @@
 import math
 import numpy as np
 import pyperclip
+import re
 
 GLfloat = lambda f: str(int(f)) + '.' if f==int(f) else str(f)[0 if f >= 1 else 1:]
-GLstr = lambda x: GLfloat(float(x))
 
-synhead = ""
+def GLstr(s):
+    try:
+        f = float(s)
+    except ValueError:
+        return s
+    else:
+        return GLfloat(f)
+
 syncode = ""
 
 #reserved keywords you cannot name a form after
@@ -33,7 +40,7 @@ def main():
         cid = line[1]
         arg = line[2:]
        
-        print(cmd, len(arg))
+        print(line)
 
         if cmd == 'main':
             if form_main is not None: print("WARNING: multiple main forms. Last definition will be the one.")
@@ -43,7 +50,7 @@ def main():
             form_list.append({'ID':cid, 'type':cmd, 'value':float(arg[0])})
     
         elif cmd == 'osc' or cmd == 'lfo':
-            form_list.append({'ID':cid, 'type':cmd, 'shape':arg[0], 'freq':arg[1], 'phase':arg[2] if len(arg)>2 else '0'})
+            form_list.append({'ID':cid, 'type':cmd, 'shape':arg[0], 'freq':arg[1], 'phase':arg[2] if len(arg)>2 else '0', 'par':arg[3] if len(arg)>3 else '0'})
 
         elif cmd == 'env': #env NAME adsf a d s f
             form_list.append({'ID':cid, 'type':cmd, 'shape':arg[0], 'attack':arg[1], 'decay':arg[2], 'sustain':arg[3], 'release':arg[4]})
@@ -72,20 +79,9 @@ def main():
 
     print("\nLIST OF FORMS:\n", sep="")
     for form in form_list:
-
-        if form['type'] == 'const':
-            synhead += 'float ' + form['ID'] + ' = ' + GLfloat(form['value']) + ';\n'
-
-        elif form['type'] == 'osc':
-            synhead += 'float ' + form['ID'] + '(float t, float f, float B, float vel, float phase, float par){return ';
-            
-            if form['shape'] == 'sin':
-                synhead += 'vel * sin(2. * PI * mod(f*t,1.) + phase);}\n'
-            else:
-                synhead += '0.;}\n'
-    
-    print("\nBUILD SYN HEADER:\n", synhead, sep="")
-
+        print(form['ID'])
+        
+        
     if not form_main:
         print("WARNING: no main form defined! will return empty sound")
         syncode = "s = 0.; //some annoying weirdo forgot to define the main form!"
@@ -93,10 +89,7 @@ def main():
     else:
         syncode = "s = "
         for term in form_main['terms']:
-            termfac = term.split('*')
-            for fac in termfac:
-                syncode += instance(fac) + ('*' if fac != termfac[-1] else '')
-            syncode += '\n' + 6*' ' + '+ ' if term != form_main['terms'][-1] else ';'
+            syncode += instance(term) + '\n' + 6*' ' + '+ ' if term != form_main['terms'][-1] else ';'
 
     gf = open("syn_framework")
     glslcode = gf.read()
@@ -114,11 +107,22 @@ def main():
     pyperclip.copy(glslcode)
     print("\nfull shader written to clipboard")
 
-def instance(ID):
-    global form_list
+def instance(ID, mod={}):
+
     form = next((f for f in form_list if f['ID']==ID), None)
     
-    if not form:
+    if mod: form.update(mod)
+    
+    if '*' in ID:    
+        IDproduct = ID.split('*')
+        product = ''
+        for factorID in IDproduct:
+            product += instance(factorID) + ('*' if factorID != IDproduct[-1] else '')
+        return product;
+
+#    if '
+
+    elif not form:
         return GLstr(ID)
     
     elif form['type']=='uniform':
@@ -128,15 +132,41 @@ def instance(ID):
         return GLfloat(form['value'])
     
     elif form['type']=='form':
-        print(form)
-        
         if form['OP'] == 'detune':
-            return 's_atan(' + instance(form['source']) + '+(1-' + instance(form['amount']) + ')*' + instance(form['source']) + ')'
+            return 's_atan(' + instance(form['source']) + '+' + instance(form['source'],{'freq':'(1.-' + instance(form['amount']) + ')*'+param(form['source'],'freq')}) + ')'
         else:
             return '1.'
-        
-    else: #basic forms - but you have to differentiate
-        return ID + '(t,f,B)'
+
+    elif form['type']=='osc':
+            if form['shape'] == 'sin':
+                if(float(form['phase'])==0):
+                    return 'vel*_sin(' + instance(form['freq']) + '*t)'
+                else:
+                    return 'vel*_sin(' + instance(form['freq']) + '*t,' + instance(form['phase']) + ')'
+            elif form['shape'] == 'saw':
+                return 'vel*(2.*fract(' + instance(form['freq']) + '*t+' + instance(form['phase']) + ')-1.)';
+            else:
+                return '0.'
+                
+    elif form['type']=='lfo':
+        pass
+
+    elif form['type']=='env':
+        pass
+
+    else:
+        return '1.';
+
+def param(ID, key):
+    form = next((f for f in form_list if f['ID']==ID), None)
+    try:
+        value = form[key]
+    except KeyError:
+        return ''
+    except TypeError:
+        return ''
+    else:
+        return value
 
 if __name__ == '__main__':
     main()

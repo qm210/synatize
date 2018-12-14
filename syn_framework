@@ -1,5 +1,6 @@
 #define PI radians(180.)
 float _sin(float a) { return sin(2. * PI * mod(a,1.)); }
+float _sin(float a, float p) { return sin(2. * PI * mod(a,1.) + p); }
 float _unisin(float a,float b) { return (.5*_sin(a) + .5*_sin((1.+b)*a)); }
 float _sq(float a) { return sign(2.*fract(a) - 1.); }
 float _squ(float a,float pwm) { return sign(2.*fract(a) - 1. + pwm); }
@@ -97,6 +98,7 @@ float THESYNTH(float t, float B, float Bon, float Boff, float note, int Bsyn)
     float Bproc = Bprog/(Boff-Bon);
     float _t = SPB*(B - Bon);
     float f = freqC1(note);
+	float vel = 1.;
 
     float env = theta(B-Bon) * theta(Boff-B);
 	float s = _sin(t*f);
