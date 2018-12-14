@@ -1,4 +1,4 @@
 osc base sin f 0
-form baseD detune base 0.01
+form baseD detune base base
 osc FMsyn saw 0.5*f base
 main baseD 0.15*FMsyn

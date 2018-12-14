@@ -2,8 +2,11 @@ import math
 import numpy as np
 import pyperclip
 import re
+import sys
 
 GLfloat = lambda f: str(int(f)) + '.' if f==int(f) else str(f)[0 if f >= 1 else 1:]
+
+syn_file = sys.argv[1] if len(sys.argv) > 1 else 'syn_template'
 
 def GLstr(s):
     try:
@@ -31,7 +34,7 @@ def main():
     global form_list
     global form_main
    
-    with open("./syn_template","r") as template:
+    with open(syn_file,"r") as template:
         lines = template.readlines()
         
     for l in lines:
