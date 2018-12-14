@@ -1,0 +1,5 @@
+osc base tri 4*f 0
+env dec expdecay 4. time
+form mainc delay dec*base 5 .5 .2
+main mainc
+main dec*base

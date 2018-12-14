@@ -18,21 +18,31 @@ def GLstr(s):
 
 syncode = ""
 
-#reserved keywords you cannot name a form after
+#reserved keywords you cannot name a form after ~ f,t are essential, and maybe we want to use the other
 _f = {'ID':'f', 'type':'uniform'}
 _t = {'ID':'t', 'type':'uniform'}
 _B = {'ID':'B', 'type':'uniform'}
-_vel = {'ID':'vel', 'type':'uniform'} # maybe we want to use that
-form_list = [_f, _t, _B, _vel]
+_vel = {'ID':'vel', 'type':'uniform'} #
+_Bproc = {'ID':'Bproc', 'type':'uniform'}
+_Bprog = {'ID':'Bprog', 'type':'uniform'}
+_L = {'ID':'L', 'type':'uniform'}
+_tL = {'ID':'tL', 'type':'uniform'}
+_SPB = {'ID':'SPB', 'type':'uniform'}
+_BPS = {'ID':'BPS', 'type':'uniform'}
+_BPM = {'ID':'BPM', 'type':'uniform'}
+_note = {'ID':'note', 'type':'uniform'}
+form_list = [_f, _t, _B, _vel, _Bproc, _Bprog, _L, _tL, _SPB, _BPS, _BPM, _note]
 
-form_main = None
+main_list = []
+
+newlineplus = '\n'+6*' '+'+'
 
 def main():
 
     global synhead
     global syncode
     global form_list
-    global form_main
+    global main_list
    
     with open(syn_file,"r") as template:
         lines = template.readlines()
@@ -48,8 +58,7 @@ def main():
         print(line)
 
         if cmd == 'main':
-            if form_main is not None: print("WARNING: multiple main forms. Last definition will be the one.")
-            form_main = {'ID':'main', 'type':'main', 'amount':len(line)-1, 'terms':line[1:]}
+            main_list.append({'ID':'main', 'type':'main', 'amount':len(line)-1, 'terms':line[1:]})
 
         elif cmd == 'const':
             form_list.append({'ID':cid, 'type':cmd, 'value':float(arg[0])})
@@ -57,13 +66,28 @@ def main():
         elif cmd == 'osc' or cmd == 'lfo':
             form_list.append({'ID':cid, 'type':cmd, 'shape':arg[0], 'freq':arg[1], 'phase':arg[2] if len(arg)>2 else '0', 'par':arg[3] if len(arg)>3 else '0'})
 
-        elif cmd == 'env': #env NAME adsf a d s f
-            form_list.append({'ID':cid, 'type':cmd, 'shape':arg[0], 'attack':arg[1], 'decay':arg[2], 'sustain':arg[3], 'release':arg[4]})
+        elif cmd == 'env': #env NAME adsr a d s r
+            shape = arg[0]
+            form = {'ID':cid, 'type':cmd, 'shape':shape}
+            
+            if shape == 'adsr' or shape == 'adsrexp':
+                form.update({'attack':arg[1], 'decay':arg[2], 'sustain':arg[3], 'release':arg[4], 'par':arg[5] if len(arg)>5 else ''})
+            elif shape == 'doubleslope':
+                form.update({'attack':arg[1], 'decay':arg[2], 'sustain':arg[3], 'par':arg[4] if len(arg)>4 else ''})
+            elif shape == 'ss':
+                form.update({'attack':arg[1], 'par':arg[2] if len(arg)>2 else ''})
+            elif shape == 'ssdrop':
+                form.update({'decay':arg[1], 'par':arg[2] if len(arg)>2 else ''})
+            elif shape == 'expdecay':
+                form.update({'decay':arg[1], 'par':arg[2] if len(arg)>2 else ''})
+            else:
+                pass
+            
+            form_list.append(form)
 
         # global automation curve - no idea on how to parametrize, but have that idea in mind
         elif cmd == 'gac':
             pass
-            form_list.append(form_main)
 
         # advanced forms ("operators"), like detune, chorus, delay, waveshaper/distortion, and more advanced: filter, reverb
         elif cmd == 'form':
@@ -72,30 +96,50 @@ def main():
 
             if op == 'mix':
                 form.update({'amount':len(arg), 'terms':arg[1:]})
-            
             elif op == 'detune':
                 form.update({'source':arg[1], 'amount':arg[2]})
-            
+            elif op == 'pitchshift':
+                form.update({'source':arg[1], 'steps':arg[2]})
+            elif op == 'quantize':
+                form.update({'source':arg[1], 'quant':arg[2]})
+            elif op == 'overdrive':
+                form.update({'source':arg[1], 'gain':arg[2]})
+            elif op == 'chorus':
+                form.update({'source':arg[1], 'number':arg[2], 'delay':arg[3]})
+            elif op == 'delay':
+                form.update({'source':arg[1], 'number':arg[2], 'delay':arg[3], 'decay':arg[4]})
             else:
                 pass
                 
             form_list.append(form)
 
         
-    if not form_main:
+    if not main_list:
         print("WARNING: no main form defined! will return empty sound")
         syncode = "s = 0.; //some annoying weirdo forgot to define the main form!"
 
     else:
-        syncode = "s = "
-        for term in form_main['terms']:
-            syncode += instance(term) + ('\n' + 6*' ' + '+ ' if term != form_main['terms'][-1] else ';')
+        if len(main_list)==1:
+            syncode = "s = "
+            for term in main_list[0]['terms']:
+                syncode += instance(term) + (newlineplus if term != main_list[0]['terms'][-1] else ';')
+           
+        else:
+            syncount = 1
+            for form_main in main_list:
+                syncode += 'if(Bsyn == ' + str(syncount) + '){\n' + 6*' ' + 's = '
+                for term in form_main['terms']:
+                    syncode += instance(term) + (newlineplus if term != form_main['terms'][-1] else ';')
+                syncode += '}\n' + 4*' '
+                syncount += 1
+
+        syncode = syncode.replace('_TIME','t').replace('_RESETTIME','_t').replace('vel*','').replace('e+00','')
 
     gf = open("syn_framework")
     glslcode = gf.read()
     gf.close()
 
-    print("\nBUILD SYN CODE:\n", syncode, sep="")
+    print("\nBUILD SYN CODE:\n", 4*' '+syncode, sep="")
     
     BPM = 80
     note = 24
@@ -111,9 +155,11 @@ def instance(ID, mod={}):
     
     form = next((f for f in form_list if f['ID']==ID), None)
     
-    if mod: form.update(mod)
+    if mod:
+        form = form.copy()
+        form.update(mod)
     
-    if '*' in ID:    
+    if '*' in ID:
         IDproduct = ID.split('*')
         product = ''
         for factorID in IDproduct:
@@ -130,27 +176,81 @@ def instance(ID, mod={}):
         return GLfloat(form['value'])
     
     elif form['type']=='form':
-        if form['OP'] == 'detune':
+        if form['OP'] == 'mix':
+            return '(' + '+'.join([instance(f) for f in form['terms']]) + ')' 
+        elif form['OP'] == 'detune':
             return 's_atan(' + instance(form['source']) + '+' + instance(form['source'],{'freq':'(1.-' + instance(form['amount']) + ')*'+param(form['source'],'freq')}) + ')'
+        elif form['OP'] == 'pitchshift':
+            return instance(form['source'],{'freq':'{:.4f}'.format(pow(2,float(form['steps'])/12)) + '*' + param(form['source'],'freq')})
+        elif form['OP'] == 'quantize':
+            return instance(form['source']).replace('_TIME','floor('+instance(form['quant']) + '*_TIME+.5)/' + instance(form['quant']))
+        elif form['OP'] == 'overdrive':
+            return 'clip(' + instance(form['gain']) + '*' + instance(form['source']) + ')'
+        elif form['OP'] == 'chorus': #not finished, needs study
+            return '(' + newlineplus.join([instance(form['source']).replace('_TIME','(_TIME-'+'{:.1e}'.format(t*float(form['delay']))+')') for t in range(int(form['number']))]) + ')'
+        elif form['OP'] == 'delay': #not finished, needs study
+            return '(' + newlineplus.join(['{:.1e}'.format(pow(float(form['decay']),t)) + '*' + \
+                                           instance(form['source']).replace('_RESETTIME','(_RESETTIME-'+'{:.1e}'.format(t*float(form['delay']))+')') for t in range(int(form['number']))]) + ')'
         else:
             return '1.'
 
-    elif form['type']=='osc':
+    elif form['type']=='osc' or form['type']=='lfo':
+
+            if form['type'] == 'osc':
+                phi = instance(form['freq']) + '*_TIME'
+                pre = 'vel*'
+
+            elif form['type'] == 'lfo':
+                phi = instance(form['freq']) + ('*Bprog' if form['par'] != 'time' else '*_TIME')
+                pre = ''
+                if form['shape'] == 'squ': form['shape'] = 'psq'
+
+                
             if form['shape'] == 'sin':
-                return 'vel*_sin(' + instance(form['freq']) + '*t,' + instance(form['phase']) + ')'
+                if form['phase'] == '0':
+                    return pre + '_sin(' + phi + ')'
+                else:
+                    return pre + '_sin(' + phi + ',' + instance(form['phase']) + ')'
+  
             elif form['shape'] == 'saw':
-                return 'vel*(2.*fract(' + instance(form['freq']) + '*t+' + instance(form['phase']) + ')-1.)';
+                return pre + '(2.*fract(' + phi + '+' + instance(form['phase']) + ')-1.)'
+            
+            elif form['shape'] == 'squ':
+                if form['par'] == '0':
+                    return pre + '_sq(' + phi + ')'
+                else:
+                    return pre + '_sq(' + phi + ',' + instance(form['par']) + ')'
+
+            elif form['shape'] == 'psq':
+                if form['par'] == '0':
+                    return pre + '_psq(' + phi + ')'
+                else:
+                    return pre + '_psq(' + phi + ',' + instance(form['par']) + ')'
+
+            elif form['shape'] == 'tri':
+                    return pre + '_tri(' + phi + '+' + instance(form['phase']) + ')'
+
             else:
                 return '0.'
-                
-    elif form['type']=='lfo':
-        pass
 
     elif form['type']=='env':
-        pass
+        if form['shape'] == 'adsr':
+            return 'env_ADSR(_RESETTIME,tL,'+instance(form['attack'])+','+instance(form['decay'])+','+instance(form['sustain'])+','+instance(form['release'])+')'
+        elif form['shape'] == 'adsrexp':
+            return 'env_ADSRexp(_RESETTIME,tL,'+instance(form['attack'])+','+instance(form['decay'])+','+instance(form['sustain'])+','+instance(form['release'])+')'
+        elif form['shape'] == 'doubleslope':
+            return 'doubleslope(_RESETTIME, '+instance(form['attack'])+','+instance(form['decay'])+','+instance(form['sustain'])+')'
+        elif form['shape'] == 'ss':
+            return 'smoothstep(0.,'+instance(form['attack'])+',_RESETTIME)'
+        elif form['shape'] == 'ssdrop':
+            return 'theta('+'_RESETTIME'+')*smoothstep('+instance(form['decay'])+',0.,_RESETTIME)'
+        elif form['shape'] == 'expdecay':
+            return 'theta('+'_RESETTIME'+')*exp(-'+instance(form['decay'])+'*_RESETTIME)'
+        else:
+            return '1.'
 
     else:
-        return '1.';
+        return '1.'
 
 def param(ID, key):
     form = next((f for f in form_list if f['ID']==ID), None)
