@@ -3,7 +3,9 @@ osc base tri .5*f 0
 env dec expdecay 4. time
 form mainc delay dec*base 5 .5 .2
 
-form mf waveshape dec*base .5 .2 .6 .4 .7 .8
+gac g1 0. 0.1 0.1 0.1 0.1 0.1 0.1 0.1
+
+form mf waveshape dec*base g1 .2 .6 .4 .7 .8
 form mfo saturate mf 10. crazy
 main mfo
 

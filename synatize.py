@@ -91,9 +91,9 @@ def main():
             
             form_list.append(form)
 
-        # global automation curve - no idea on how to parametrize, but have that idea in mind
+        # global automation curve - implemented just one for now, let's think of something great some other time
         elif cmd == 'gac':
-            pass
+            form_list.append({'ID':cid, 'type':cmd, 'par':arg})
 
         # advanced forms ("operators"), like detune, chorus, delay, waveshaper/distortion, and more advanced: filter, reverb
         elif cmd == 'form':
@@ -265,6 +265,9 @@ def instance(ID, mod={}):
             return 'theta('+'_RESETTIME'+')*exp(-'+instance(form['decay'])+'*_RESETTIME)'
         else:
             return '1.'
+
+    elif form['type']=='gac':
+        return 'GAC(_TIME,' + ','.join([instance(form['par'][p]) for p in range(8)]) + ')'
 
     else:
         return '1.'

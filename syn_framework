@@ -51,9 +51,10 @@ float supershape(float s, float amt, float A, float B, float C, float D, float E
     return m*mix(s,w,amt);
 }
 
-float GAC(float t, float a, float b, float c, float d, float e, float f, float g)
+float GAC(float t, float offset, float a, float b, float c, float d, float e, float f, float g)
 {
-    return a + b*t + c*t*t + d*sin(e*t) + f*exp(-g*t);
+    t = t - offset;
+    return t<0. ? 0. : a + b*t + c*t*t + d*sin(e*t) + f*exp(-g*t);
 }
 
 float TRISQ(float t, float f, int MAXN, float MIX, float INR, float NDECAY, float RES, float RES_Q)
