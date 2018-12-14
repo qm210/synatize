@@ -22,7 +22,8 @@ syncode = ""
 _f = {'ID':'f', 'type':'uniform'}
 _t = {'ID':'t', 'type':'uniform'}
 _B = {'ID':'B', 'type':'uniform'}
-_vel = {'ID':'vel', 'type':'uniform'} #
+_vel = {'ID':'vel', 'type':'uniform'}
+_Bsyn = {'ID':'Bsyn', 'type':'uniform'}
 _Bproc = {'ID':'Bproc', 'type':'uniform'}
 _Bprog = {'ID':'Bprog', 'type':'uniform'}
 _L = {'ID':'L', 'type':'uniform'}
@@ -31,7 +32,7 @@ _SPB = {'ID':'SPB', 'type':'uniform'}
 _BPS = {'ID':'BPS', 'type':'uniform'}
 _BPM = {'ID':'BPM', 'type':'uniform'}
 _note = {'ID':'note', 'type':'uniform'}
-form_list = [_f, _t, _B, _vel, _Bproc, _Bprog, _L, _tL, _SPB, _BPS, _BPM, _note]
+form_list = [_f, _t, _B, _vel, _Bsyn, _Bproc, _Bprog, _L, _tL, _SPB, _BPS, _BPM, _note]
 
 main_list = []
 
@@ -43,6 +44,8 @@ def main():
     global syncode
     global form_list
     global main_list
+   
+    print('READING', './' + syn_file + ':')
    
     with open(syn_file,"r") as template:
         lines = template.readlines()
@@ -56,6 +59,9 @@ def main():
         arg = line[2:]
        
         print(line)
+        if cmd != 'main' and cid in [f['ID'] for f in form_list]:
+            print(' -> ERROR! ID \"' + cid + '\" already taken. Ignoring line.')
+            continue
 
         if cmd == 'main':
             main_list.append({'ID':'main', 'type':'main', 'amount':len(line)-1, 'terms':line[1:]})
