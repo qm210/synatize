@@ -35,6 +35,8 @@ def main():
         lines = template.readlines()
         
     for l in lines:
+        if l[0]=='#': continue
+    
         line = l.split()
         cmd = line[0]
         cid = line[1]
@@ -76,11 +78,6 @@ def main():
                 
             form_list.append(form)
 
-
-    print("\nLIST OF FORMS:\n", sep="")
-    for form in form_list:
-        print(form['ID'])
-        
         
     if not form_main:
         print("WARNING: no main form defined! will return empty sound")
@@ -89,13 +86,13 @@ def main():
     else:
         syncode = "s = "
         for term in form_main['terms']:
-            syncode += instance(term) + '\n' + 6*' ' + '+ ' if term != form_main['terms'][-1] else ';'
+            syncode += instance(term) + ('\n' + 6*' ' + '+ ' if term != form_main['terms'][-1] else ';')
 
     gf = open("syn_framework")
     glslcode = gf.read()
     gf.close()
 
-    print("\nBUILD SYN BODY:\n", syncode, sep="")
+    print("\nBUILD SYN CODE:\n", syncode, sep="")
     
     BPM = 80
     note = 24
@@ -108,7 +105,7 @@ def main():
     print("\nfull shader written to clipboard")
 
 def instance(ID, mod={}):
-
+    
     form = next((f for f in form_list if f['ID']==ID), None)
     
     if mod: form.update(mod)
@@ -119,8 +116,6 @@ def instance(ID, mod={}):
         for factorID in IDproduct:
             product += instance(factorID) + ('*' if factorID != IDproduct[-1] else '')
         return product;
-
-#    if '
 
     elif not form:
         return GLstr(ID)
@@ -139,10 +134,7 @@ def instance(ID, mod={}):
 
     elif form['type']=='osc':
             if form['shape'] == 'sin':
-                if(float(form['phase'])==0):
-                    return 'vel*_sin(' + instance(form['freq']) + '*t)'
-                else:
-                    return 'vel*_sin(' + instance(form['freq']) + '*t,' + instance(form['phase']) + ')'
+                return 'vel*_sin(' + instance(form['freq']) + '*t,' + instance(form['phase']) + ')'
             elif form['shape'] == 'saw':
                 return 'vel*(2.*fract(' + instance(form['freq']) + '*t+' + instance(form['phase']) + ')-1.)';
             else:
